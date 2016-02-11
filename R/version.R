@@ -49,11 +49,11 @@
                                    "date",
                                    "bdate"))
 {
-    rinla.hgid =  inla.trim("hgid: 1abe0ad337d2  date: Mon Feb 08 20:02:18 2016 +0100")
-    inla.hgid  =  inla.trim("hgid: 1abe0ad337d2  date: Mon Feb 08 20:02:18 2016 +0100")
-    date       =  inla.trim("Tue  9 Feb 18:30:23 CET 2016")
-    bdate      =  inla.trim("201602091830")
-    version      =  inla.trim("0.0-1455039023")
+    rinla.hgid =  inla.trim("hgid: 4fecbbcdd094  date: Wed Feb 10 11:01:18 2016 +0100")
+    inla.hgid  =  inla.trim("hgid: 4fecbbcdd094  date: Wed Feb 10 11:01:18 2016 +0100")
+    date       =  inla.trim("Wed 10 Feb 11:08:11 CET 2016")
+    bdate      =  inla.trim("201602101108")
+    version      =  inla.trim("0.0-1455098891")
     what = match.arg(what)
 
     if (what %in% c("default", "info")) {
