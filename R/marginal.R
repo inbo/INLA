@@ -15,7 +15,6 @@
 ##! \alias{inla.rmarginal}
 ##! \alias{inla.hpdmarginal}
 ##! \alias{hpdmarginal}
-##! \alias{inla.expectation}
 ##! \alias{inla.emarginal}
 ##! \alias{emarginal}
 ##! \alias{inla.marginal.expectation}
@@ -178,7 +177,7 @@
     ## density is to small compared to the maximum density. (othewise
     ## we can get trouble with the spline interpolation). same with
     ## 'x'? No...
-    eps = .Machine$double.eps^(1/4)
+    eps = .Machine$double.eps * 1000
     ##marginal = spline(marginal)
     if (is.matrix(marginal)) {
         i = (marginal[, 2] > 0) & (abs(marginal[, 2]/max(marginal[, 2])) > eps)
@@ -255,10 +254,6 @@
     return (list(range = r, fun = splinefun(m$x, log(m$y))))
 }
 
-`inla.expectation` = function(fun, marginal, ...) {
-    return (inla.emarginal(fun, marginal, ...))
-}
-
 `inla.emarginal` = function(fun, marginal, ...)
 {
     ## compute E(FUN(x)), where the marginal of x is given in
@@ -267,15 +262,21 @@
 
     xx = inla.smarginal(marginal)
     n = length(xx$x)
-    if (n%%2 == 0)
+    if (n%%2 == 0) {
         n = n -1
+        xx$x = xx$x[1:n]
+        xx$y = xx$y[1:n]
+    }
+    
     ## use Simpsons integration rule
     i.0 = c(1, n)
     i.4 = seq(2, n-1, by=2)
     i.2 = seq(3, n-2, by=2)
 
+    dx = diff(xx$x)
+    dx = 0.5 * (c(dx, 0) + c(0, dx))
     fun = match.fun(fun)
-    ff = fun(xx$x[1:n], ...) * xx$y[1:n]
+    ff = fun(xx$x[1:n], ...) * xx$y[1:n] * dx
     nf = length(ff) %/% n
     e = numeric(nf)
     off = 0L
@@ -285,7 +286,7 @@
     }
 
     ## normalise, so that E(1) = 1
-    ff = 1 * xx$y[1:n] 
+    ff = dx * xx$y[1:n] 
     e.1 = sum(sum(ff[i.0]) + 4*sum(ff[i.4]) + 2*sum(ff[i.2]))
 
     return (e/e.1)

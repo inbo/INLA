@@ -15,8 +15,8 @@
 ##!\author{Havard Rue \email{hrue@math.ntnu.no} }
 ##!\seealso{\code{\link{inla}}}
 
-'inla.changelog' = function()
+`inla.changelog` = function()
 {
-    browseURL("http://bitbucket.org/hrue/r-inla/commits/all")
+    browseURL("https://bitbucket.org/hrue/r-inla/commits/all")
     return (invisible())
 }

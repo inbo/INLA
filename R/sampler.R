@@ -9,17 +9,20 @@
 ##!\title{Produce samples from the approximated joint posterior for the hyperparameters}
 ##!
 ##!\description{Produce samples from the approximated joint posterior for the hyperparameters}
+##!
 ##!\usage{
-##!inla.hyperpar.sample(n, result, intern=FALSE)
+##!inla.hyperpar.sample(n, result, intern=FALSE, improve.marginals = FALSE)
 ##!}
 ##!
 ##!\arguments{
 ##!  \item{n}{Integer. Number of samples required.}
 ##!  \item{result}{An \code{inla}-object,  f.ex the output from an \code{inla}-call.}
 ##!  \item{intern}{Logical. If \code{TRUE} then produce samples in the
-##!  intern scale for the hyperparmater, if \code{FALSE} then produce
-##!  samples in the user-scale. (For example log-precision (intern)
-##!  and precision (user-scale))}
+##!        internal scale for the hyperparmater, if \code{FALSE} then produce
+##!        samples in the user-scale. (For example log-precision (intern)
+##!        and precision (user-scale))}
+##!  \item{improve.marginals}{Logical. If \code{TRUE}, then improve the samples taking into account
+##!        possible better marginal estimates for the hyperparameters in \code{result}.} 
 ##!}
 ##!
 ##!\value{%%
@@ -31,22 +34,32 @@
 ##!\author{Havard Rue \email{hrue@math.ntnu.no}}
 ##!
 ##!\examples{
-##!r = inla(y ~ 1, data = data.frame(y=1:10), family = "t")
-##!x = inla.hyperpar.sample(10,r)
-##!str(x)
+##!n = 100
+##!r = inla(y ~ 1 + f(idx), data = data.frame(y=rnorm(n), idx = 1:n))
+##!ns = 500
+##!x = inla.hyperpar.sample(ns, r)
+##!
+##!rr = inla.hyperpar(r)
+##!xx = inla.hyperpar.sample(ns, rr, improve.marginals=TRUE)
 ##!}
 
 
-`inla.hyperpar.sample` = function(n, result, intern=FALSE)
+`inla.hyperpar.sample` = function(n, result, intern=FALSE, improve.marginals = FALSE)
 {
     ## generate 'n' samples from the joint for the hyperparameters
     ## computed using the CCD approach. if intern==TRUE, then generate
-    ## the variables in their internal scale otherwise in the user
+    ## the variables in their intern scale otherwise in the user
     ## scale.
     
     stopifnot(!is.null(result))
     stopifnot(any(class(result) == "inla"))
     stopifnot(n > 0)
+
+    if (improve.marginals) {
+        ns = max(n, 300L)
+    } else {
+        ns = n
+    }
 
     sigma = result$misc$cov.intern
     if (dim(sigma)[1L] == 0L) {
@@ -62,41 +75,72 @@
         sd.neg = rep(1.0, p)
     }
 
-    ## do each column  dim(z) = n x p,  each row is one sample
-    z = matrix(NA, n, p)
+    ## do each column  dim(z) = ns x p,  each row is one sample
+    z = matrix(NA, ns, p)
     for(i in 1L:p) {
-        ## this is ok as n >> p, usually.
         prob = c(sd.plus[i], sd.neg[i])
-        direction = sample.int(2L, n, prob = prob, replace=TRUE)
+        direction = sample.int(2L, ns, prob = prob, replace=TRUE)
         s = c(sd.plus[i], -sd.neg[i])
-        z[, i] = s[direction] * abs(rnorm(n))
+        z[, i] = s[direction] * abs(rnorm(ns))
     }
     A = result$misc$cov.intern.eigenvectors %*%
         diag(sqrt(result$misc$cov.intern.eigenvalues), nrow = p, ncol = p)
     theta = apply(z, 1L,
-            function(x, A, m) A %*% x + m,
-            A = A, m = result$misc$theta.mode)
-    ## fix for p > 1
+                  function(x, A, m) A %*% x + m,
+                  A = A, m = result$misc$theta.mode)
     if (p > 1L) {
         theta = t(theta)
     } else {
-        theta = matrix(theta, n, p)
+        theta = matrix(theta, ns, p)
     }
     
-    if (!intern) {
-        ## map to user-scale. do each column at the time as n >> p,
-        ## usually.
+    if (improve.marginals) {
         for(i in 1L:p) {
-            theta[, i] = result$misc$from.theta[[i]]( theta[, i] )
+            cdf.old = ecdf(theta[,i]) 
+            theta[,i] <- inla.qmarginal((ns/(ns+1.0))* cdf.old(theta[,i]),
+                                        result$internal.marginals.hyperpar[[i]])
+        }
+    }
+
+    theta = theta[1:n,, drop=FALSE]
+    if (!intern) {
+        for(i in 1L:p) {
+            theta[, i] = result$misc$from.theta[[i]](theta[, i])
         }
     }
 
     if (intern) {
         colnames(theta) = names(result$misc$to.theta)
     } else {
-        colnames(theta) = paste(names(result$misc$to.theta), "in user-scale")
+        colnames(theta) = inla.transform.names(result, names(result$misc$to.theta))
     }
     rownames(theta) = paste("sample-", inla.num(1L:n), sep="")
 
     return (theta)
+}
+
+inla.transform.names = function(res, nms)
+{
+    ## enter name of a hyperpar, return the corresponding name in either in the internal or user
+    ## scale
+    ret = c()
+    for (nm in nms) {
+        def = paste(nm, "-- unknown")
+        if (is.null(res$internal.summary.hyperpar) || is.null(res$summary.hyperpar)) {
+            ret = c(ret, def)
+        } else {
+            i = which(nm == rownames(res$internal.summary.hyperpar))
+            if (length(i) == 1) {
+                ret = c(ret, rownames(res$summary.hyperpar)[i])
+            } else {
+                i = which(nm == rownames(res$summary.hyperpar))
+                if (length(i) == 1) {
+                    ret = c(ret, rownames(res$internal.summary.hyperpar)[i])
+                } else {
+                    ret = c(ret, def)
+                }
+            }
+        }
+    }
+    return (ret)
 }

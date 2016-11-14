@@ -1,4 +1,3 @@
-
 ## Export: inla
 
 ##! \name{inla}
@@ -156,7 +155,7 @@
         ##!nodes in the latent field. The posterior distribution
         ##!of such linear combination is computed by the
         ##!\code{inla} function. See
-        ##!\url{http://www.r-inla.org/faq} for examples of
+        ##!\url{www.r-inla.org/faq} for examples of
         ##!how to define such linear combinations.}
         lincomb = NULL,
         
@@ -937,6 +936,7 @@
     ## create the .file.ini and make the problem.section
     file.ini = paste(inla.dir, "/Model.ini", sep="")
     file.log = paste(inla.dir, "/Logfile.txt", sep="")
+    file.log2 = paste(inla.dir, "/Logfile2.txt", sep="")
 
     ## problem section
     if (debug) 
@@ -1005,7 +1005,7 @@
     ## offset = as.vector(model.extract(mf, "offset"))
 
     for (nm in c("scale", "weights", "Ntrials", "offset", "E", "strata", "link.covariates")) {
-        inla.eval(paste("tmp = try(eval(mf$", nm, ", data), silent=TRUE)", sep=""))
+        inla.eval(paste("tmp = try(eval(mf$", nm, ", data, enclos = parent.frame()), silent=TRUE)", sep=""))
         if (!is.null(tmp) && !inherits(tmp, "try-error")) {
             inla.eval(paste("mf$", nm, " = NULL", sep=""))
             inla.eval(paste(nm, " = tmp"))
@@ -1220,9 +1220,6 @@
     j=0
     extra.fixed=0
 
-    rgeneric = list()
-    nrgeneric = 0
-    
     if (nr>0) {
         name.random.dir=c()
         if (nr!=(ncol(rf)-1))
@@ -1287,7 +1284,7 @@
         }            
         if (debug) {
             for(r in 1:nr)
-                print(paste(r, gp$random.spec[[r]]$model, gp$random.spec[[r]]$of))
+                cat(paste(r, gp$random.spec[[r]]$model, gp$random.spec[[r]]$of, gp$random.spec[[r]]$same.as), "\n")
         }
         
         all.terms = c()
@@ -1296,13 +1293,6 @@
         
         for (r in 1:nr) {
             n = nrep = ngroup = N = NULL
-            
-            if (gp$random.spec[[r]]$model == "rgeneric") {
-                ## collect it and give it an Id
-                nrgeneric = nrgeneric + 1L
-                rgeneric[[nrgeneric]] = gp$random.spec[[r]]$rgeneric
-                gp$random.spec[[r]]$rgeneric$Id = nrgeneric
-            }
             
             if (gp$random.spec[[r]]$model != "linear") {
                 ##in this case we have to add a FFIELD section.........
@@ -1399,6 +1389,25 @@
                             stop(paste("There are one or more NA's in 'group' where 'idx' in f(idx,...) is not NA: idx = \'",
                                        gp$random.spec[[r]]$term, "\'", sep=""))
                         group[ is.na(xx) ] = 1
+
+                        ## issue a WARNING,  if there are to many unused groups
+                        g.used = unique(sort(group))
+                        g.unused = setdiff(1:ngroup, g.used)
+                        ng.used = length(g.used)
+                        ng.unused = length(g.unused)
+
+                        txt = paste("f(", gp$random.spec[[r]]$term, ", ...)",  sep="")
+                        if (!is.element(1, g.used)) {
+                            warning(paste(txt, ": ", 
+                                          "There is no indices where group[]=1, this is *usually* a misspesification"),
+                                    immediate. = TRUE)
+                        }
+                        if (ng.unused >= ng.used) {
+                            warning(paste(txt, ": ", 
+                                          "Number of unused groups >= the number of groups used: ", ng.unused, " >= ", ng.used, 
+                                        ", this is *usually* a misspesification", sep=""),
+                                    immediate. = TRUE)
+                        }
                     }
                 } else {
                     N = NULL
@@ -1834,6 +1843,9 @@
     inla.eval(paste("Sys.setenv(", "\"INLA_PATH\"", "=\"", system.file("bin", package="INLA"), "\"", ")", sep=""))
     inla.eval(paste("Sys.setenv(", "\"INLA_OS\"", "=\"", inla.os.type() , "\"", ")", sep=""))
     inla.eval(paste("Sys.setenv(", "\"INLA_HGVERSION\"", "=\"", inla.version("hgid") , "\"", ")", sep=""))
+    rversion = paste(R.Version()$major, ".", strsplit(R.Version()$minor,"[.]")[[1]][1], sep="")
+    inla.eval(paste("Sys.setenv(", "\"INLA_RVERSION\"", "=\"", rversion , "\"", ")", sep=""))
+    inla.eval(paste("Sys.setenv(", "\"INLA_RHOME\"", "=\"", Sys.getenv("R_HOME") , "\"", ")", sep=""))
     if (debug) {
         inla.eval(paste("Sys.setenv(", "\"INLA_DEBUG=\"", "=\"", 1, "\"", ")", sep=""))
     }
@@ -1860,49 +1872,29 @@
     ## ...meaning that if inla.call = "" then just build the files (optionally...)
     if (nchar(inla.call) > 0) {
         if (inla.os("linux") || inla.os("mac")) {
-            if (nrgeneric > 0L) {
-                if (!inla.require("parallel")) {
-                    stop("Library 'parallel' is required to use the 'rgeneric'-model.")
-                }
-                if (inla.os("mac")) {
-                    ## cannot run in verbose mode
-                    all.args = gsub("-v", "", all.args)
-                    tmp.0 = parallel::mcparallel(system(paste(shQuote(inla.call), all.args, shQuote(file.ini))))
-                } else {
-                    if (verbose) {
-                        tmp.0 = parallel::mcparallel(system(paste(shQuote(inla.call), all.args, shQuote(file.ini))))
-                    } else {
-                        tmp.0 = parallel::mcparallel(system(paste(shQuote(inla.call), all.args, shQuote(file.ini), " > ", file.log,
-                            inla.ifelse(silent == 2L, " 2>/dev/null", ""))))
-                    }
-                }
-                for (i in 1L:nrgeneric) {
-                    inla.eval(paste("tmp.", i, " = parallel::mcparallel(inla.rgeneric.loop(rgeneric[[", i, "]], debug=debug))", sep=""))
-                }
-                inla.eval(paste("tmp = parallel::mccollect(list(tmp.0,", paste("tmp.", 1L:nrgeneric, collapse=",", sep=""), "))"))
-                echoc = tmp[[1L]]
+            if (verbose) {
+                echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini)))
             } else {
-                if (verbose) {
-                    echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini)))
-                } else {
-                    echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini), " > ", file.log,
-                        inla.ifelse(silent == 2L, " 2>/dev/null", "")))
-                }
+                echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini), " > ", file.log,
+                    inla.ifelse(silent == 2L, " 2>/dev/null", "")))
             }
         } else if (inla.os("windows")) {
             if (!remote && !submit) {
                 if (verbose) {
                     echoc = try(system2(inla.call, args=paste(all.args, shQuote(file.ini)), stdout="", stderr="", wait=TRUE))
                 } else {
-                    bat.file = paste(tempfile(), ".BAT",  sep="")
-                    cat("@echo off\n",  file=bat.file, append=FALSE)
-                    cat(paste(shQuote(inla.call), all.args, "-v", shQuote(file.ini), ">", shQuote(file.log),
-                              inla.ifelse(silent == 2L, "2>NUL", "")), file=bat.file, append=TRUE)
-                    ## this one fails on windows in run from within emacs
-                    ##echoc = try(shell(paste("@", shQuote(bat.file), sep=""), wait=TRUE), silent=FALSE)
-                    ## try this one which is reported to work
-                    echoc = try(system2(bat.file, wait=TRUE), silent=FALSE)
-                    unlink(bat.file)
+                    if (FALSE) {
+                        ## old .bat-solution
+                        bat.file = paste(tempfile(), ".BAT",  sep="")
+                        cat("@echo off\n",  file=bat.file, append=FALSE)
+                        cat(paste(shQuote(inla.call), all.args, "-v", shQuote(file.ini), ">", shQuote(file.log),
+                                  inla.ifelse(silent == 2L, "2>NUL", "")), file=bat.file, append=TRUE)
+                        echoc = try(system2(bat.file, wait=TRUE), silent=FALSE)
+                        unlink(bat.file)
+                    } else {
+                        ## new try
+                        echoc = try(system2(inla.call, args=paste(all.args, shQuote(file.ini)), stdout=file.log, stderr=file.log2, wait=TRUE))
+                    }
                 }
                 if (echoc != 0L) {
                     if (!verbose && (silent != 2L)) {
@@ -1931,7 +1923,7 @@
         if (echoc == 0L) {
             if (!submit) {
                 ret = try(inla.collect.results(results.dir, control.results=cont.results, debug=debug,
-                    only.hyperparam=only.hyperparam, file.log = file.log), silent=FALSE)
+                    only.hyperparam=only.hyperparam, file.log = file.log, file.log2=file.log2), silent=FALSE)
                 if (!is.list(ret)) {
                     ret = list()
                 }
@@ -1982,10 +1974,14 @@
                 inla.inlaprogram.has.crashed()
             } else {
                 ## with a crash, try to collect the logfile only
-                ret = try(inla.collect.logfile(file.log, debug), silent = TRUE)
-                if (inherits(ret, "try-error")) {
+                ret1 = try(inla.collect.logfile(file.log, debug), silent = TRUE)
+                ret2 = try(inla.collect.logfile(file.log2, debug), silent = TRUE)
+                if (inherits(ret1, "try-error")) { ## yes,  its 'ret1'
                     ret = NULL
                 } else {
+                    ret = list(logfile = c(ret1$logfile,
+                                           "", paste(rep("*",72),sep="",collapse=""), "", 
+                                           ret2$logfile))
                     class(ret) = "inla"
                 }
             }

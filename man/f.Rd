@@ -15,7 +15,7 @@
 
 }
 \usage{
-    f(..., 
+    f(...,
          model = "iid",
          copy=NULL,
          same.as = NULL,
@@ -52,20 +52,20 @@
          spde2.transform = c("logit", "log", "identity"),
          spde3.prefix = NULL,
          spde3.transform = c("logit", "log", "identity"),
-         mean.linear = inla.set.control.fixed.default()$mean, 
-         prec.linear = inla.set.control.fixed.default()$prec, 
+         mean.linear = inla.set.control.fixed.default()$mean,
+         prec.linear = inla.set.control.fixed.default()$prec,
          compute = TRUE,
          of=NULL,
          precision = 1.0e9,
          range = NULL,
          adjust.for.con.comp = TRUE,
-         order = NULL, 
-         scale = NULL, 
-         strata = NULL, 
-         rgeneric = NULL, 
-         scale.model = NULL, 
-         args.slm = list(rho.min = NULL, rho.max = NULL, X = NULL, W = NULL, Q.beta = NULL), 
-         correct = NULL, 
+         order = NULL,
+         scale = NULL,
+         strata = NULL,
+         rgeneric = NULL,
+         scale.model = NULL,
+         args.slm = list(rho.min = NULL, rho.max = NULL, X = NULL, W = NULL, Q.beta = NULL),
+         correct = NULL,
          debug = FALSE)
 }
 \arguments{
@@ -152,7 +152,7 @@ THE MORE GENERAL ARGUMENT \code{graph}. PLEASE CHANGE YOUR
 CODE.
 Name of the file containing the graph
 of the model; see
-\url{http://www.r-inla.org/faq}.}
+\url{www.r-inla.org/faq}.}
 \item{cdf}{A vector of maximum 10 values between 0 and 1
 \eqn{x(0), x(1),\ldots}{x(0), x(1),\ldots}. The function
 returns, for each posterior marginal the probabilities
@@ -211,10 +211,10 @@ model \code{ar} this defines the order p, in AR(p). Not
 used for other models at the time being.}
 \item{scale}{A scaling vector. Its meaning depends on the model.}
 \item{strata}{A stratum vector. It meaning depends on the model.}
-\item{rgeneric}{A object of class \code{inla-rgeneric} which defines the model. (EXPERIMENTAL!)}
-\item{scale.model}{Logical. If \code{TRUE} then scale the RW1 and RW2 and BESAG and BYM and BESAG2 and RW2D models so the their (generlized) variance is 1. Default value is \code{inla.getOption("scale.model.default")}} 
-\item{args.slm}{Required arguments to the model="slm"; see the documentation for further details.}, 
-\item{correct}{Add this model component to the list of variables to be used in the corrected Laplace approximation? If \code{NULL} use default choice,  otherwise correct if \code{TRUE} and do not if \code{FALSE}. (This option is currently experimental.)}, 
+\item{rgeneric}{A object of class \code{inla.rgeneric} which defines the model. (EXPERIMENTAL!)}
+\item{scale.model}{Logical. If \code{TRUE} then scale the RW1 and RW2 and BESAG and BYM and BESAG2 and RW2D models so the their (generlized) variance is 1. Default value is \code{inla.getOption("scale.model.default")}}
+\item{args.slm}{Required arguments to the model="slm"; see the documentation for further details.},
+\item{correct}{Add this model component to the list of variables to be used in the corrected Laplace approximation? If \code{NULL} use default choice,  otherwise correct if \code{TRUE} and do not if \code{FALSE}. (This option is currently experimental.)},
 \item{debug}{Enable local debug output}
 }
 \value{TODO}

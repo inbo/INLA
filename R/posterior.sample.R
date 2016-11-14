@@ -6,41 +6,68 @@
 ##! 
 ##! \title{Generate samples from an approximated posterior of a fitted model}
 ##! 
-##! \description{This function generate samples from an approximated posterior of a fitted model,  ie an inla-object}
+##! \description{This function generate samples from an approximated posterior
+##!              of a fitted model (an inla-object}
 ##! \usage{
-##!     inla.posterior.sample(n = 1L, result, hyper.user.scale = TRUE, use.improved.mean = TRUE)
+##!     inla.posterior.sample(n = 1L, result, intern = FALSE, use.improved.mean = TRUE,
+##!                           add.names = TRUE, seed = 0L)
 ##! }
 ##! 
 ##! \arguments{
 ##!   \item{n}{Number of samples.}
-##!   \item{result}{The inla-object, ie the output from an \code{inla}-call. The \code{inla}-object must be created with
-##!                 \code{control.compute=list(config=TRUE)}.}
-##!   \item{hyper.user.scale}{Logical. If \code{TRUE} then values of
-##!   the hyperparameters are given in the user scale (for example
-##!   \code{precision}). If \code{FALSE} then values of the
-##!   hyperparameters are given in the internal representation (for
-##!   example \code{log(precision)}).}
+##!   \item{result}{The inla-object, ie the output from an \code{inla}-call.
+##!       The \code{inla}-object must be created with
+##!       \code{control.compute=list(config=TRUE)}.}
 ##!   \item{use.improved.mean}{Logical. If \code{TRUE} then use the
-##!   marginal mean values when constructing samples. If \code{FALSE}
-##!   then use the mean in the Gaussian approximations.}
+##!       marginal mean values when constructing samples. If \code{FALSE}
+##!       then use the mean in the Gaussian approximations.}
+##!  \item{intern}{Logical. If \code{TRUE} then produce samples in the
+##!       internal scale for the hyperparmater, if \code{FALSE} then produce
+##!       samples in the user-scale. (For example log-precision (intern)
+##!       and precision (user-scale))}
+##!   \item{add.names}{Logical. If \code{TRUE} then add name for each elements of each
+##!       sample. If \code{FALSE}, only add name for the first sample. 
+##!       (This save space.)}
+##!   \item{seed}{Control the RNG of \code{inla.qsample},
+##!       see \code{?inla.qsample} for further information.
+##!       If \code{seed=0L} then GMRFLib will set the seed intelligently/at 'random'.
+##!       If \code{seed < 0L}  then the saved state of the RNG will be reused if possible, otherwise,
+##!       GMRFLib will set the seed intelligently/at 'random'.
+##!       If \code{seed > 0L} then this value is used as the seed for the RNG.
+##!       If you want reproducible results,  you ALSO need to control the seed for the RNG in R by
+##!       controlling the variable \code{.Random.seed} or using the function \code{set.seed},
+##!       the example for how this can be done. }
 ##!}
-##!\value{ A list of the samples, where each sample is a list with
-##!  names \code{hyperpar} and \code{latent}, and with their marginal
-##!  densities in \code{logdens$hyperpar} and \code{logdens$latent}
-##!  and the joint density is in \code{logdens$joint}.  THIS IS AN
-##!  EXPERIMENTAL FUNCTION AND CHANGES MAY APPEAR AT ANY TIME!  }
+##!\details{The hyperparameters are sampled from the configurations used to do the
+##!       numerical integration,  hence if you want a higher resolution,  you need to
+##!       to change the \code{int.stratey} variable and friends. The latent field is
+##!       sampled from the Gaussian approximation conditioned on the hyperparameters,
+##!       but with a correction for the mean (default).
+##!}
+##!\value{A list of the samples, where each sample is a list with
+##!     names \code{hyperpar} and \code{latent}, and with their marginal
+##!     densities in \code{logdens$hyperpar} and \code{logdens$latent}
+##!     and the joint density is in \code{logdens$joint}.
+##!}
 ##!\author{Havard Rue \email{hrue@math.ntnu.no}}
 ##! 
 ##!\examples{
 ##!  r = inla(y ~ 1 ,data = data.frame(y=rnorm(1)), control.compute = list(config=TRUE))
 ##!  samples = inla.posterior.sample(2,r)
+##!
+##!  ## reproducible results:
+##!  set.seed(1234)
+##!  inla.seed = as.integer(runif(1)*.Machine$integer.max)
+##!  x = inla.posterior.sample(100, r, seed = inla.seed)
+##!  set.seed(1234)
+##!  xx = inla.posterior.sample(100, r, seed = inla.seed)
+##!  all.equal(x, xx)
 ##!}
 
 
-`inla.posterior.sample` = function(n = 1, result, hyper.user.scale = TRUE, use.improved.mean = TRUE)
+`inla.posterior.sample` = function(n = 1, result, intern = FALSE,
+    use.improved.mean = TRUE, add.names = TRUE, seed = 0L)
 {
-    warning("inla.posterior.sample: THIS FUNCTION IS EXPERIMENTAL!!!")
-    
     stopifnot(!missing(result) && any(class(result) == "inla"))
     if (is.null(result$misc$configs)) {
         stop("You need an inla-object computed with option 'control.compute=list(config = TRUE)'.")
@@ -63,15 +90,14 @@
         n.idx[i] = sum(idx == i)
     }
 
-    all.samples = list(list())
-    all.samples[[n]] = NA
+    all.samples = rep(list(c()), n)
     i.sample = 1L
     for(k in 1:cs$nconfig) {
         if (n.idx[k] > 0) {
             ## then the latent field
             xx = inla.qsample(n=n.idx[k], Q=cs$config[[k]]$Q,
                     mu = inla.ifelse(use.improved.mean, cs$config[[k]]$improved.mean, cs$config[[k]]$mean), 
-                    constr = cs$constr, logdens = TRUE)
+                    constr = cs$constr, logdens = TRUE, seed = seed)
             nm = c()
             ld.theta = cs$max.log.posterior + cs$config[[k]]$log.posterior
             for(j in 1:length(cs$contents$tag)) {
@@ -85,11 +111,11 @@
             
             theta = cs$config[[k]]$theta
             log.J = 0.0
-            if (!is.null(theta) && hyper.user.scale) {
+            if (!is.null(theta) && !intern) {
                 for(j in 1:length(theta)) {
                     theta[j] = do.call(result$misc$from.theta[[j]], args = list(theta[j]))
                 }
-                names(theta) = paste(names(theta), "-- in user scale")
+                names(theta) = inla.transform.names(result, names(theta))
                 
                 if (TRUE) {
                     ## new fancy code using the automatic differentiation feature in R
@@ -151,7 +177,7 @@
                                     latent = as.numeric(xx$logdens[i]),
                                     joint = as.numeric(ld.h + xx$logdens[i])))
                 }
-                rownames(a.sample$latent) = nm
+                rownames(a.sample$latent) = if (add.names || i.sample == 1L) nm else NULL
                 all.samples[[i.sample]] = a.sample
                 i.sample = i.sample + 1L
             }    

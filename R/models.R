@@ -150,7 +150,7 @@
                      aug.constr = NULL,
                      n.div.by = NULL,
                      n.required = FALSE,
-                     set.default.values = FALSE,
+                     set.default.values = TRUE,
                      status = "experimental", 
                      pdf = "rgeneric"
                      ),
@@ -4498,6 +4498,7 @@
                              )), 
                      pdf = NA
                      ), 
+
                  logoffset = list(
                      ## variant = 0, a+exp(...),  a>0
                      ## variant = 1, a-exp(...),  a>0
@@ -4514,6 +4515,23 @@
                              from.theta = function(x) exp(x)
                              )),
                      pdf = "logoffset"
+                     ), 
+
+                 logitoffset = list(
+                     hyper = list(
+                         theta = list(
+                             hyperid =  49011,
+                             name = "prob",
+                             short.name = "p",
+                             prior = "normal",
+                             param = c(-1, 100),
+                             initial = -1,
+                             fixed = FALSE,
+                             to.theta = function(x) log(x/(1-x)),
+                             from.theta = function(x) exp(x)/(1+exp(x))
+                             )),
+                     status = "experimental", 
+                     pdf = "logitoffset"
                      ), 
 
                  test1 = list(
@@ -4804,7 +4822,8 @@
                          ),
                      survival = FALSE,
                      discrete = TRUE,
-                     link = c("default", "logit", "cauchit", "probit", "cloglog", "loglog", "log", "sslogit"),
+                     link = c("default", "logit", "cauchit", "probit", "cloglog", "loglog",
+                              "log", "sslogit", "logitoffset"),
                      pdf = "binomial"
                      ),
 
@@ -5370,7 +5389,7 @@
                          theta = list(
                              hyperid =  79001,
                              name = "log alpha",
-                             short.name = "a",
+                             short.name = "alpha",
                              initial = 0,
                              fixed = FALSE,
                              prior = "loggamma",
