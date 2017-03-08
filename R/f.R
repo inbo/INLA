@@ -54,7 +54,7 @@
 ##!         prec.linear = inla.set.control.fixed.default()$prec,
 ##!         compute = TRUE,
 ##!         of=NULL,
-##!         precision = 1.0e9,
+##!         precision = exp(14),
 ##!         range = NULL,
 ##!         adjust.for.con.comp = TRUE,
 ##!         order = NULL,
@@ -279,7 +279,7 @@
     of=NULL,
 
     ##!\item{precision}{The precision for the artifical noise added when creating a copy of a model and others.}
-    precision = 1.0e9,
+    precision = exp(14),
 
     ##!\item{range}{A vector of size two giving the lower and
     ##!upper range for the scaling parameter \code{beta} in the
@@ -349,39 +349,37 @@
     ## is also used in the inla() function itself.
     if (any(inherits(model, inla.model.object.classes()))) {
         if (any(inherits(model, inla.spde.object.classes()))) {
-          ## Write specific spde models to disk. These files should be
-          ## move/removed later in the code instead of copied.
-          ## Perhaps in section.R, since that where the copy now takes
-          ## place?
-          my.spde.prefix <- inla.fmesher.make.prefix(NULL, NULL)
-          if (any(inherits(model, "inla.spde1"))) {
-            spde.prefix <- my.spde.prefix
-            ## inla checks PREFIX valididy by looking for "s"
-            model$param.inla <- list(
-              s=spde$mesh$loc,
-              c0=internal$c0,
-              g1=internal$g1,
-              g2=internal$g2,
-              basis.T=internal$basis.T,
-              basis.K=internal$basis.K)
-            spde.matrices <- names(model$param.inla)
-          } else if (any(inherits(model, "inla.spde2"))) {
-            spde2.prefix <- my.spde.prefix
-            spde.matrices <- c("M0", "M1", "M2",
-                               "B0", "B1", "B2", "BLC")
-          } else if (any(inherits(model, "inla.spde3"))) {
-            spde3.prefix <- my.spde.prefix
-            spde.matrices <- c("M0", "M1", "M2", "M3",
-                               "B0", "B1", "B2", "B3", "BLC")
-          }
-          for (spde.matrix.name in spde.matrices) {
-            ## Only write matrix if it is non-empty (only happens for BLC)
-            if (nrow(model$param.inla[[spde.matrix.name]]) > 0) {
-              fmesher.write(inla.affirm.double(
-                model$param.inla[[spde.matrix.name]]),
-                my.spde.prefix, spde.matrix.name)
+            ## Write specific spde models to disk. These files are
+            ## removed later in inla.copy.dir.for.section.spde, in section.R
+            my.spde.prefix <- inla.fmesher.make.prefix(NULL, NULL)
+            if (any(inherits(model, "inla.spde1"))) {
+                spde.prefix <- my.spde.prefix
+                ## inla checks PREFIX valididy by looking for "s"
+                model$param.inla <- list(
+                    s=model$mesh$loc,
+                    c0=model$internal$c0,
+                    g1=model$internal$g1,
+                    g2=model$internal$g2,
+                    basis.T=model$internal$basis.T,
+                    basis.K=model$internal$basis.K)
+                spde.matrices <- names(model$param.inla)
+            } else if (any(inherits(model, "inla.spde2"))) {
+                spde2.prefix <- my.spde.prefix
+                spde.matrices <- c("M0", "M1", "M2",
+                                   "B0", "B1", "B2", "BLC")
+            } else if (any(inherits(model, "inla.spde3"))) {
+                spde3.prefix <- my.spde.prefix
+                spde.matrices <- c("M0", "M1", "M2", "M3",
+                                   "B0", "B1", "B2", "B3", "BLC")
             }
-          }
+            for (spde.matrix.name in spde.matrices) {
+                ## Only write matrix if it is non-empty (only happens for BLC)
+                if (nrow(model$param.inla[[spde.matrix.name]]) > 0) {
+                    fmesher.write(inla.affirm.double(
+                        model$param.inla[[spde.matrix.name]]),
+                        my.spde.prefix, spde.matrix.name)
+                }
+            }
         }
 
         atmp = paste(unlist(lapply(as.list(formals(INLA::f)), function(x) names(x))))
@@ -519,8 +517,8 @@
         }
     }
 
-    ## check that 'order' is define only for model AR (at this moment)
-    if (inla.one.of(model, "ar")) {
+    ## check that 'order' is defined
+    if (inla.one.of(model, c("ar"))) {
         if (is.null(order) || missing(order) || order < 1L) {
             stop("Model 'ar' needs 'order' to be defined as an integer > 0.")
         }
@@ -529,6 +527,15 @@
         if (order > max.order) {
             stop(paste("Model 'ar': order=", order, ", is to large. max.order =", max.order, sep=""))
         }
+    }
+    if (inla.one.of(model, "fgn")) {
+        if (is.null(order) || missing(order)) {
+            ## which is 3L for the moment
+            order = inla.models()$latent$fgn$order.default
+        } else {
+            order = as.integer(order)
+        }
+        stopifnot(any(order == inla.models()$latent$fgn$order.defined))
     }
 
     ## Check that the Cmatrix is defined for those models needing it, and oposite.
@@ -789,10 +796,10 @@
 
     ## if diagonal is not set, the set this depending on the constr
     if (is.null(diagonal)) {
-        if (constr) {
+        if (constr || !empty.extraconstr(extraconstr)) {
             diagonal = inla.set.f.default()$diagonal
         } else {
-            diagonal = 0
+            diagonal = 0.0
         }
     }
 
@@ -801,117 +808,121 @@
         A=extraconstr$A
         e=extraconstr$e
         if (!is.matrix(A)) {
-            stop("A(extraconstraint) has to be a matrix")
+            stop("A(extraconstr) has to be a matrix")
         } else {
             if (nrow(A)!=length(e)) {
                 stop("Dimension of A and e do not correspond")
             }
         }
-
-        ##print.extraconstr = paste("list(A=", deparse(extraconstr$A, backtick = TRUE, width.cutoff = 500),",",
-        ##    "e=", deparse(extraconstr$e, backtick = TRUE, width.cutoff = 500),")")
     }
 
-    if (adjust.for.con.comp && inla.one.of(model, c("besag", "besag2", "bym", "bym2"))) {
-
-        ## I am not sure if this is the best place to do this, but for
-        ## the time being I'll do this here.
-
-        ## For the model = "besag", "bym", "bym2" and "besag2", we need to
-        ## check if the graph contains more than 1 connected
-        ## components. If so, we need to modify the meaning of
-        ## constr=TRUE, and set the correct value of rankdef.
-
-        ## However, although this is the correct way to do this, it is
-        ## not common to do it like this, so therefore, I issue a
-        ## warning.
-
+    if (inla.one.of(model, c("besag", "besag2", "bym", "bym2"))) {
+        ## this is a somewhat complicated case
         g = inla.read.graph(graph)
-        if (g$cc$n == 1) {
-            ## hole graph is just one connected component. all is
-            ## fine, no need to do anything
-            if (is.null(rankdef)) {
-                rankdef = 1L
-            }
-        } else {
+        cc.n = sapply(g$cc$nodes, length)
+        cc.n1 = sum(cc.n == 1L)
+        cc.n2 = sum(cc.n >= 2L)
 
-            ## issue a warning, as the model has 'changed' compared to earlier versions.
-            warning(paste("The graph for the model", model, "has", g$cc$n,
-                          "connected components!!! Model is revised accordingly.", sep= " "))
-
-            cc.n = sapply(g$cc$nodes, length)
-            cc.n2 = sum(cc.n >= 2L)
-            dimA = 0
-
-            if (debug) {
-                print(paste("modify model", model))
-                print(paste("number of connected components", inla.paste(cc.n)))
-                print(paste("number of connected components of size >= 2L", cc.n2))
-            }
-
-            if (constr) {
-                ## need to redefine the meaning of constr = TRUE to mean
-                ## constr=TRUE for all connected components with size > 1
-
-                ## like bym/bym2 place the constr on the second half
-                m = inla.model.properties(model, "latent")
-                if (m$augmented) {
-                    N = m$aug.factor * n
-                    offset = (m$aug.constr -1L) * n
-                    stopifnot(length(offset) == 1)
-                } else {
-                    N = n
-                    offset = 0
-                }
-                constr = FALSE
-                AA = matrix(0, cc.n2, N)
-                ee = rep(0, cc.n2)
-
-                if (debug) {
-                    print(paste("add new extraconstr, dim = ", cc.n2, "x", n))
-                }
-
-                k = 1L
-                for(i in 1L:length(cc.n)) {
-                    if (cc.n[i] >= 2L) {
-                        AA[k, offset + g$cc$nodes[[i]]] = 1
-                        k = k + 1L
-                    }
-                }
-                stopifnot(k-1L == cc.n2)
-
-                if (!empty.extraconstr(extraconstr)) {
-                    dimA = dim(extraconstr$A)[1] ## need to remember this one for the 'rankdef'
-                    extraconstr$A = rbind(AA, extraconstr$A)
-                    extraconstr$e = c(ee, extraconstr$e)
-                } else {
-                    extraconstr = list(A = AA, e = ee)
+        if (adjust.for.con.comp) {
+            ## we need to check if the graph contains more than 1 connected components. If so,
+            ## we need to modify the meaning of constr=TRUE, and set the correct value of
+            ## rankdef.
+            if (g$cc$n == 1) {
+                ## the whole graph is just one connected component. all is fine
+                if (is.null(rankdef)) {
+                    rankdef = 0
+                    if (constr)
+                        rankdef = rankdef + 1
+                    if (!empty.extraconstr(extraconstr))
+                        rankdef = rankdef + dim(extraconstr$A)[1]
                 }
             } else {
-                if (!missing(adjust.for.con.comp)) {
-                    stop("The option 'adjust.for.con.comp' is only used for models 'besag', 'besag2', 'bym' and 'bym2'.")
+                if (debug) {
+                    print(paste("modify model", model))
+                    print(paste("number of connected components", inla.paste(cc.n)))
+                    print(paste("number of connected components of size >= 2L", cc.n2))
+                }
+                if (constr) {
+                    ## need to redefine the meaning of constr = TRUE to mean
+                    ## constr=TRUE for all connected components with size >= 2L
+
+                    ## like bym/bym2 place the constr on the second half
+                    m = inla.model.properties(model, "latent")
+                    if (m$augmented) {
+                        N = m$aug.factor * n
+                        offset = (m$aug.constr -1L) * n
+                        stopifnot(length(offset) == 1)
+                    } else {
+                        N = n
+                        offset = 0
+                    }
+                    constr = FALSE
+                    AA = matrix(0, cc.n2, N)
+                    ee = rep(0, cc.n2)
+
+                    if (debug) {
+                        print(paste("add new extraconstr, dim = ", cc.n2, "x", n))
+                    }
+
+                    k = 1L
+                    for(i in 1L:length(cc.n)) {
+                        if (cc.n[i] >= 2L) {
+                            AA[k, offset + g$cc$nodes[[i]]] = 1
+                            k = k + 1L
+                        }
+                    }
+                    stopifnot(k-1L == cc.n2)
+
+                    if (!empty.extraconstr(extraconstr)) {
+                        extraconstr$A = rbind(AA, extraconstr$A)
+                        extraconstr$e = c(ee, extraconstr$e)
+                    } else {
+                        extraconstr = list(A = AA, e = ee)
+                    }
+
+                    if (debug) {
+                        print(AA)
+                        print(ee)
+                    }
+                } else {
+                    if (!missing(adjust.for.con.comp)) {
+                        stop("The option 'adjust.for.con.comp' is only used for models 'besag', 'besag2', 'bym' and 'bym2'.")
+                    }
+                }
+
+                ## set correct rankdef if not set already
+                if (is.null(rankdef)) {
+                    if (!scale.model) {
+                        rankdef = cc.n1
+                        if (!empty.extraconstr(extraconstr))
+                            rankdef = rankdef + dim(extraconstr$A)[1]
+                    } else {
+                        rankdef = 0
+                        if (!empty.extraconstr(extraconstr))
+                            rankdef = dim(extraconstr$A)[1]
+                    }
+                }
+
+                if (is.null(diagonal)) {
+                    diagonal = inla.set.f.default()$diagonal
+                    if (debug) {
+                        print(paste("set diagonal = ", diagonal))
+                    }
                 }
             }
-
-            ## set correct rankdef if not set manually. well, this is
-            ## not failsafe without detailed analysis, but then we
-            ## asssume that the user knows the correct rankdef (s)he
-            ## will set it correctly. Note that regions with no
-            ## neigbours only reduce 'n' as they do not contribute to the rankdef.
+        } else {
+            ## adjust.for.con.comp == FALSE
             if (is.null(rankdef)) {
-                cc.n1 = sum(cc.n == 1)
-                rankdef = cc.n1 + dimA + (g$n - sum(cc.n[ cc.n >= 2L ] -1L))
-                if (debug) {
-                    print(paste("redefine rankdef = ", rankdef))
-                }
-            }
-
-            ## need this, either if there is extraconstr or if there
-            ## are regions without neighbours.
-            if (is.null(diagonal) && (!empty.extraconstr(extraconstr) || any(cc.n == 1))) {
-                diagonal = inla.set.f.default()$diagonal
-                if (debug) {
-                    print(paste("set diagonal = ", diagonal))
+                rankdef = 0
+                if (scale.model) {
+                    if (constr) rankdef = rankdef + 1
+                    if (!empty.extraconstr(extraconstr)) 
+                        rankdef = rankdef + dim(extraconstr$A)[1]
+                } else {
+                    if (constr) rankdef = rankdef + 1
+                    rankdef = rankdef + cc.n1
+                    if (!empty.extraconstr(extraconstr)) 
+                        rankdef = rankdef + dim(extraconstr$A)[1]
                 }
             }
         }
@@ -989,6 +1000,7 @@
         correct = correct
         )
 
+    if (debug) print(ret)
     return (ret)
 }
 

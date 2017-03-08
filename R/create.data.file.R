@@ -17,7 +17,9 @@
 {
     if (is.null(y.orig)) {
         y.orig = c(mf[, 1L])
-    } else if (inherits(y.orig, "inla.surv")) {
+    } else if (is.inla.surv(y.orig)) {
+        y.orig = as.data.frame(unclass(y.orig))
+    } else if (is.inla.mdata(y.orig)) {
         y.orig = as.data.frame(unclass(y.orig))
     } else {
         y.orig = as.data.frame(y.orig)
@@ -42,8 +44,8 @@
 
     if (inla.one.of(family, c("gaussian",
                               "normal",
+                              "lognormal",
                               "t",
-                              "laplace",
                               "sn",
                               "sn2",
                               "skewnormal",
@@ -104,6 +106,7 @@
         response = response[!null.dat,]
 
     } else if (inla.one.of(family, c("poisson",
+                                     "qpoisson", 
                                      "cenpoisson", 
                                      "gpoisson", 
                                      "zeroinflatedpoisson0",
@@ -132,7 +135,7 @@
         null.dat = is.na(response[, 3L])
         response = response[!null.dat,]
 
-    } else if (inla.one.of(family, c("gammacount"))) {
+    } else if (inla.one.of(family, c("gammacount", "exponential", "weibull"))) {
 
         response = cbind(ind, y.orig)
         null.dat = is.na(response[, 2L])
@@ -154,7 +157,7 @@
         }
 
         stopifnot(all(!is.na(strata)))
-        stopifnot(all(strata %in% c(1, 2)))
+        stopifnot(all(strata %in% 1:10))
 
         response = cbind(ind, E, strata-1L, y.orig)
 
@@ -181,6 +184,7 @@
                              "zeroinflatedbinomial1",
                              "zeroinflatedbinomial2",
                              "zeroninflatedbinomial2",
+                             "zeroninflatedbinomial3",
                              "zeroinflatedbetabinomial0",
                              "zeroinflatedbetabinomial1",
                              "zeroinflatedbetabinomial2",
@@ -205,43 +209,40 @@
         null.dat = is.na(response[, 4L])
         response = response[!null.dat,]
 
-    } else if (inla.one.of(family, c("exponential", "weibull", "weibullcure", "loglogistic",  "lognormal"))) {
+    } else if (inla.one.of(family, c("exponentialsurv", "weibullsurv", "weibullcure", "loglogistic",  "lognormalsurv"))) {
 
         if (!inla.model.properties(family, "likelihood")$survival) {
             file.remove(file)
             file.remove(data.dir)
             stop("This should not happen.")
         }
-
-        if (is.null(y.orig$truncation)) {
-            file.remove(file)
-            file.remove(data.dir)
-            stop("Responce does not contain variable `truncation'.")
-        }
-        if (is.null(y.orig$lower)) {
-            file.remove(file)
-            file.remove(data.dir)
-            stop("Responce does not contain variable `lower'.")
-        }
-        if (is.null(y.orig$upper)) {
-            file.remove(file)
-            file.remove(data.dir)
-            stop("Responce does not contain variable `upper'.")
-        }
-        if (is.null(y.orig$event)) {
-            file.remove(file)
-            file.remove(data.dir)
-            stop("Responce does not contain variable `event'.")
-        }
         if (is.null(y.orig$time)) {
             file.remove(file)
             file.remove(data.dir)
             stop("Responce does not contain variable `time'.")
         }
+        len = length(y.orig$time)
+
+        if (is.null(y.orig$truncation)) {
+            y.orig$truncation = rep(0, len)
+        }
+        if (is.null(y.orig$lower)) {
+            y.orig$lower = rep(0, len)
+        }
+        if (is.null(y.orig$upper)) {
+            y.orig$upper = rep(Inf, len)
+        }
+        if (is.null(y.orig$event)) {
+            y.orig$event = rep(1, len)
+        }
 
         idx = !is.na(y.orig$time)
-        response = cbind(ind[idx], y.orig$event[idx], y.orig$truncation[idx], y.orig$lower[idx], y.orig$upper[idx], y.orig$time[idx])
-
+        response = cbind(ind[idx],
+                         y.orig$event[idx],
+                         y.orig$truncation[idx],
+                         y.orig$lower[idx],
+                         y.orig$upper[idx],
+                         y.orig$time[idx])
         if (any(is.na(response))) {
             file.remove(file)
             file.remove(data.dir)
@@ -249,12 +250,41 @@
         }
 
     } else if (inla.one.of(family, c("stochvol", "stochvolt", "stochvolnig", "loggammafrailty",
-                                     "iidlogitbeta", "kumar"))) {
-
+                                     "iidlogitbeta", "qkumar", "qloglogistic"))) {
         response = cbind(ind, y.orig)
         null.dat = is.na(response[, 2L])
         response = response[!null.dat,]
 
+    } else if (inla.one.of(family, c("nmix"))) {
+
+        mmax = length(inla.model.properties(model="nmix", section="likelihood")$hyper)
+        response = cbind(IDX=ind, y.orig)
+        col.idx = grep("^IDX$", names(response))
+        col.x = grep("^X[0-9]+", names(response))
+        col.y = grep("^Y[0-9]+", names(response))
+        m.x = length(col.x)
+        m.y = length(col.y)
+        stopifnot(m.x >= 1 && m.x <= mmax)
+
+        ## remove entries with NA's in all responses
+        na.y = apply(response[, col.y, drop=FALSE], 1, function(x) all(is.na(x)))
+        response = response[!na.y,, drop=FALSE]
+
+        X = response[, col.x, drop=FALSE]
+        Y = response[, col.y, drop=FALSE]
+        idx = response[, col.idx, drop=FALSE]
+        yfake = rep(-1, nrow(Y))
+
+        ## replace NA's in the covariates with 0's
+        X[is.na(X)] = 0
+        ## augment X til the maximum allowed,  padding with NA's
+        X = cbind(X, matrix(NA, nrow = nrow(response), ncol = mmax -m.x)) 
+
+        ## sort each row so that the NA's are at the end. Sort numerically the non-NA's as well
+        ## although it is not required
+        Y = matrix(c(apply(Y, 1, function(x) c(sort(x[!is.na(x)]), x[is.na(x)]))), ncol = ncol(Y), byrow=TRUE)
+        response = cbind(idx, X, Y, yfake)
+        
     } else {
 
         file.remove(file)

@@ -28,6 +28,8 @@
         tmp.prior = gsub("^[ \t]+", "", tmp.prior)
         ## if the expression ends with a ";" with or without spaces, remove it
         tmp.prior = gsub(";*[ \t]*$", "", tmp.prior)
+        ## if there is a 'return (' replace it with 'return('
+        tmp.prior = gsub("return[ \t]+\\(", "return(", tmp.prior)
         ## for all priors except the "expression:" one,  then trim the name
         if (length(grep("^(expression|table)[ \t]*:", tolower(tmp.prior))) == 0L) {
             tmp.prior = inla.trim.family(tmp.prior)
@@ -128,14 +130,11 @@
         cat("cenpoisson.I = ", interval[1], " ",  interval[2], "\n", sep="", file=file, append=TRUE)
     }
 
-    if (inla.one.of(family, "laplace")) {
-        ## two parameters, alpha and epsilon is require for LAPLACE
-        cat("alpha = ", inla.ifelse(is.null(control$alpha), 0.5, control$alpha), "\n",
-            sep="", file=file, append=TRUE)
-        cat("epsilon = ", inla.ifelse(is.null(control$epsilon), 0.01, control$epsilon), "\n",
-            sep="", file=file, append=TRUE)
-        cat("gamma = ", inla.ifelse(is.null(control$gamma), 1.0, control$gamma), "\n",
-            sep="", file=file, append=TRUE)
+    if (inla.one.of(family, c("qloglogistic", "qkumar", "qpoisson"))) {
+        if (!(is.numeric(control$quantile) && (control$quantile > 0) && (control$quantile < 1))) {
+            stop(paste("quantile: Must be a numeric in the interval (0, 1)"))
+        }
+        cat("quantile = ", control$quantile, "\n", sep="", file=file, append=TRUE)
     }
 
     if (inla.one.of(family, c("sn", "skewnormal"))) {
@@ -268,7 +267,7 @@
             cat("of =", random.spec$of, "\n", sep = " ", file = file,  append = TRUE)
         }
     }
-    if (inla.one.of(random.spec$model, c("copy", "sigm", "revsigm", "log1exp"))) {
+    if (inla.one.of(random.spec$model, c("copy", "sigm", "revsigm", "log1exp", "fgn"))) {
         if (!is.null(random.spec$precision)) {
             cat("precision =", random.spec$precision, "\n", sep = " ", file = file,  append = TRUE)
         }
@@ -618,7 +617,7 @@
         }
     }
 
-    if (random.spec$model == "ar") {
+    if (inla.one.of(random.spec$model, c("ar", "fgn"))) {
         cat("order = ", random.spec$order, "\n", append=TRUE, sep = " ", file = file)
     }
 
@@ -898,6 +897,11 @@
     cat("##inladatadir = ", gsub("^.*/","", data.dir), "\n", sep = "", file = file,  append = TRUE) #
     cat("##inlaresdir = ", gsub("^.*/","", result.dir), "-%d\n", sep = "", file = file,  append = TRUE) #
 
+    ## libR-stuff
+    cat("\n", sep = " ", file = file,  append = TRUE)
+    cat("[INLA.libR]\n", sep = " ", file = file,  append = TRUE)
+    cat("type = libR\n", sep = " ", file = file,  append = TRUE)
+    cat("R_HOME = ", Sys.getenv("R_HOME"), "\n", sep = "", file = file,  append = TRUE)
 
     cat("\n", sep = " ", file = file,  append = TRUE)
     cat("[INLA.Model]\n", sep = " ", file = file,  append = TRUE)
@@ -930,17 +934,12 @@
         return (NULL)
     } else if (is.numeric(prior)) {
         return (prior)
-    } else {
-        if (is.null(inla.eval(paste("prior$", name, sep="")))) {
-            if (!is.null(prior$default)) {
-                return (prior$default)
-            } else {
-                return (NULL)
-            }
-        } else {
-            return (inla.eval(paste("prior$", name, sep="")))
-        }
-    }
+    } else if (any(name == names(prior))) {
+        return (prior[[which(name == names(prior))]])
+    } else if (any("default" == names(prior))) {
+        return (prior[[which("default" == names(prior))]])
+    } 
+    return (NULL)
 }
 
 `inla.linear.section` = function(file, file.fixed, label, results.dir, control.fixed, only.hyperparam)
@@ -1049,7 +1048,6 @@
         cat("cpo.idx = ", args$cpo.idx -1,"\n", sep = " ", file = file,  append = TRUE)
     }
     if (!is.null(args$jp.func)) {
-        cat("jp.R_HOME = ", Sys.getenv("R_HOME"), "\n", sep = " ", file = file, append = TRUE)
         cat("jp.func = ", args$jp.func, "\n", sep = " ", file = file, append = TRUE)
         if (!is.null(args$jp.Rfile)) {
             fnm = inla.copy.file.for.section(args$jp.Rfile, data.dir)

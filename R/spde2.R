@@ -1,8 +1,9 @@
 ## 'spde2' model functions
-## Export: inla.spde.precision.inla.spde2
+## Export: inla.spde.precision!inla.spde2
 ## Export: inla.spde.result!inla.spde2 inla.spde2.generic
 ## Export: inla.spde2.matern param2.matern.orig
 ## Export: inla.spde2.matern.sd.basis inla.spde2.models
+## Export: inla.spde2.pcmatern
 ## Export: inla.spde2.precision inla.spde2.result
 ## Export: inla.spde2.theta2phi0 inla.spde2.theta2phi1 inla.spde2.theta2phi2
 ## Internal: inla.internal.spde2.matern.B.tau
@@ -436,33 +437,37 @@ inla.spde2.matern =
              theta.prior.mean = NULL,
              theta.prior.prec = 0.1,
              n.iid.group = 1,
-             prior.pc.rho = NULL,
-             prior.pc.sig = NULL)
+             ...)
 {
-    ## Temporary implementation of PC prior for standard deviation and range
-    ##    - Changes parametrization to range and standard deviation
-    ##    - Sets prior according to hyperparameters for range   : prior.pc.rho
-    ##                                              and std.dev.: prior.pc.sig
-        if(!is.null(prior.pc.rho) && !is.null(prior.pc.sig)){
-            # Call inla.spde2.matern with range and standard deviation parametrization
-            d = inla.ifelse(inherits(mesh, "inla.mesh"), 2, 1)
-            nu = alpha-d/2
-            kappa0 = log(8*nu)/2
-            tau0   = 0.5*(lgamma(nu)-lgamma(nu+d/2)-d/2*log(4*pi))-nu*kappa0
-            spde   = inla.spde2.matern(mesh = mesh,
-                                       B.tau   = cbind(tau0,   nu,  -1),
-                                       B.kappa = cbind(kappa0, -1, 0))
+  if(!is.null(list(...)[["prior.pc.rho"]]) &&
+     !is.null(list(...)[["prior.pc.sig"]])){
+      ## Temporary implementation of PC prior for standard deviation and range
+      ##    - Changes parametrization to range and standard deviation
+      ##    - Sets prior according to hyperparameters for range   : prior.pc.rho
+      ##                                              and std.dev.: prior.pc.sig
+      warning("You're using a deprecated experimental PC prior matern model that will be removed in a future version of the package. Use 'inla.spde2.pcmatern' instead.")
+      prior.pc.rho <- list(...)[["prior.pc.rho"]]
+      prior.pc.sig <- list(...)[["prior.pc.sig"]]
 
-            # Change prior information
-            param = c(prior.pc.rho, prior.pc.sig)
-            spde$f$hyper.default$theta1$prior = "pcspdega"
-            spde$f$hyper.default$theta1$param = param
-            spde$f$hyper.default$theta1$initial = log(prior.pc.rho[1])+1
-            spde$f$hyper.default$theta2$initial = log(prior.pc.sig[1])-1
+      ## Call inla.spde2.matern with range and standard deviation parametrization
+      d = inla.ifelse(inherits(mesh, "inla.mesh"), 2, 1)
+      nu = alpha-d/2
+      kappa0 = log(8*nu)/2
+      tau0   = 0.5*(lgamma(nu)-lgamma(nu+d/2)-d/2*log(4*pi))-nu*kappa0
+      spde   = inla.spde2.matern(mesh = mesh,
+                                 B.tau   = cbind(tau0,   nu,  -1),
+                                 B.kappa = cbind(kappa0, -1, 0))
 
-            # End and return
-            return(invisible(spde))
-        }
+      ## Change prior information
+      param = c(prior.pc.rho, prior.pc.sig)
+      spde$f$hyper.default$theta1$prior = "pcspdega"
+      spde$f$hyper.default$theta1$param = param
+      spde$f$hyper.default$theta1$initial = log(prior.pc.rho[1])+1
+      spde$f$hyper.default$theta2$initial = log(prior.pc.sig[1])-1
+
+      ## End and return
+      return(invisible(spde))
+    }
 
     ## Standard code
     inla.require.inherits(mesh, c("inla.mesh", "inla.mesh.1d"), "'mesh'")
@@ -648,6 +653,112 @@ inla.spde2.matern =
 
 
 
+inla.spde2.pcmatern =
+    function(mesh,
+             alpha = 2,
+             param = NULL,
+             constr = FALSE,
+             extraconstr.int = NULL,
+             extraconstr = NULL,
+             fractional.method = c("parsimonious", "null"),
+             n.iid.group = 1,
+             prior.range = NULL,
+             prior.sigma = NULL)
+{
+  ## Implementation of PC prior for standard deviation and range
+  ##    - Sets the parametrization to range and standard deviation
+  ##    - Sets prior according to hyperparameters for range   : prior.range
+  ##                                              and std.dev.: prior.sigma
+  ## Calls inla.spde2.matern to construct the object, then changes the prior
+  if (inherits(mesh, "inla.mesh")) {
+    d <- 2
+  } else if (inherits(mesh, "inla.mesh.1d")) {
+    d <- 1
+  } else {
+    stop(paste("Unknown mesh class '",
+               paste(class(mesh), collapse=",", sep=""),
+               "'.", sep=""))
+  }
+
+  if (missing(prior.range) || is.null(prior.range) ||
+      !is.vector(prior.range) || (length(prior.range) != 2)) {
+    stop("'prior.range' should be a length 2 vector 'c(range0,tailprob)' or a fixed range specified with 'c(range,NA)'.")
+  }
+  if (missing(prior.sigma) || is.null(prior.sigma) ||
+      !is.vector(prior.sigma) || (length(prior.sigma) != 2)) {
+    stop("'prior.sigma' should be a length 2 vector 'c(sigma0,tailprob)' or a fixed sigma specified with 'c(sigma,NA)'.")
+  }
+  if (prior.range[1] <= 0){
+    stop("'prior.range[1]' must be a number greater than 0 specifying a spatial range")
+  }
+  if (prior.sigma[1] <= 0){
+    stop("'prior.sigma[1]' must be a number greater than 0 specifying a standard deviation")
+  }
+  if (!is.na(prior.range[2]) &&
+      ((prior.range[2] <= 0) || (prior.range[2] >= 1))) {
+    stop("'prior.range[2]' must be a probaility strictly between 0 and 1 (or NA to specify a fixed range)")
+  }
+  if (!is.na(prior.sigma[2]) &&
+      ((prior.sigma[2] <= 0) || (prior.sigma[2] >= 1))) {
+    stop("'prior.sigma[2]' must be a probaility strictly between 0 and 1 (or NA to specify a fixed sigma)")
+  }
+
+  nu <- alpha-d/2
+  if (nu <= 0) {
+    stop(paste("Smoothness nu = alpha-dim/2 = ", nu,
+               ", but must be > 0.", sep=""))
+  }
+
+  kappa0 <- log(8*nu)/2
+  tau0   <- 0.5*(lgamma(nu)-lgamma(nu+d/2)-d/2*log(4*pi))-nu*kappa0
+  spde   <- inla.spde2.matern(mesh = mesh,
+                              B.tau   = cbind(tau0,   nu,  -1),
+                              B.kappa = cbind(kappa0, -1, 0),
+                              alpha = alpha,
+                              param = NULL,
+                              constr = constr,
+                              extraconstr.int = extraconstr.int,
+                              extraconstr = extraconstr,
+                              fractional.method = fractional.method,
+                              n.iid.group = n.iid.group)
+
+  ## Calculate hyperparameters
+  is.fixed.range <- is.na(prior.range[2])
+  if (is.fixed.range) {
+    lam1 <- 0
+    initial.range <- log(prior.range[1])
+  } else {
+    lam1 <- -log(prior.range[2])*prior.range[1]^(d/2)
+    initial.range <- log(prior.range[1]) + 1
+  }
+
+  is.fixed.sigma <- is.na(prior.sigma[2])
+  if (is.fixed.sigma){
+    lam2 <- 0
+    initial.sigma <- log(prior.sigma[1])
+  } else{
+    lam2 <- -log(prior.sigma[2])/prior.sigma[1]
+    initial.sigma <- log(prior.sigma[1]) - 1
+  }
+
+  pcmatern.param = c(lam1, lam2, d)
+
+  ## Change prior information
+  spde$f$hyper.default <-
+    list(theta1=list(prior="pcmatern",
+                     param=pcmatern.param,
+                     initial=initial.range,
+                     fixed=is.fixed.range),
+         theta2=list(initial=initial.sigma,
+                     fixed=is.fixed.sigma))
+
+  ## Change the model descriptor
+  spde$model = "pcmatern"
+
+  invisible(spde)
+}
+
+
 
 
 
@@ -688,13 +799,14 @@ inla.spde2.iheat =
     inla.require.inherits(mesh.time, c("inla.mesh.1d"),
                           "'mesh.time'")
 
-    if (is.null(param)) {
-        param =
-            param2.iheat(
-                mesh.space, mesh.time,
-                theta.prior.mean,
-                theta.prior.prec)
-    }
+  if (is.null(param)) {
+    stop("Use param2.iheat() to construct the prior parameter settings")
+    ##        param =
+    ##            param2.iheat(
+    ##                mesh.space, mesh.time,
+    ##                theta.prior.mean,
+    ##                theta.prior.prec)
+  }
 
     d.space = inla.ifelse(inherits(mesh.space, "inla.mesh.1d"), 1, 2)
     d.time = 1
@@ -716,7 +828,8 @@ inla.spde2.iheat =
         fem.time$c0 = fem.time$c1 ## Use higher order matrix.
     }
 
-    ## TODO: the rest
+  ## TODO: the rest
+  if (FALSE) {
 
     if (alpha==2) {
         B.phi0 = param$B.tau
@@ -809,6 +922,9 @@ inla.spde2.iheat =
     }
 
     return(invisible(spde))
+  }
+
+  invisible(NULL)
 }
 
 
@@ -987,7 +1103,7 @@ inla.spde2.result = function(inla, name, spde, do.transform=TRUE, ...)
 
 inla.spde2.models = function()
 {
-    return(c("generic", "matern"))
+    return(c("generic", "matern", "pcmatern"))
 }
 
 

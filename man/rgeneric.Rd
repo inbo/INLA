@@ -10,13 +10,15 @@
 \alias{inla.rgeneric.ar1.model}
 \alias{rgeneric.iid.model}
 \alias{inla.rgeneric.iid.model}
+\alias{rgeneric.wrapper}
+\alias{inla.rgeneric.wrapper}
 
 \title{rgeneric models}
 
 \description{A framework for defining latent models in R}
 
 \usage{
-inla.rgeneric.define(model = NULL, debug = TRUE, R.init = NULL, ...)
+inla.rgeneric.define(model = NULL, debug = FALSE, R.init = NULL, ...)
 inla.rgeneric.iid.model(
         cmd = c("graph", "Q", "mu", "initial", "log.norm.const", "log.prior", "quit"),
         theta = NULL, args = NULL)
@@ -34,7 +36,7 @@ inla.rgeneric.wrapper(
   \item{cmd}{An allowed request}
   \item{theta}{Values of theta}
   \item{debug}{Logical. Turn on/off debugging}
-  \item{R.init}{An R-file to be loaded or sourced, when the R-engine starts. See \code{inla.load}.}
+  \item{R.init}{An R-file to be loaded or sourced, when the R-engine starts. See \code{inla.load}}
   \item{args}{A list. A list of further args}
   \item{...}{Further args}
   \item{debug}{Logical. Enable debug output}

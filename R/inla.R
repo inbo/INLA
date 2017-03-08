@@ -587,6 +587,9 @@
         if (inherits(y...orig, "inla.surv")) {
             class(y...orig) = NULL
             ny = max(sapply(y...orig, length))
+        } else if (inherits(y...orig, "inla.mdata")) {
+            class(y...orig) = NULL
+            ny = max(sapply(y...orig, length))
         } else {
             if (length(dim(y...orig)) == 2) {
                 ## some matrix type, could be a sparse matrix
@@ -714,11 +717,17 @@
             stop(paste("Unknown value for flag 'expand.factor.strategy' in 'control.fixed':",
                        cont.fixed$expand.factor.strategy))
         }
-
-        gp$model.matrix = model.matrix(new.fix.formula,
-            data=model.frame(new.fix.formula, data.same.len, na.action=inla.na.action),
-            contrasts.arg = contrasts)
-        
+        if (inla.require("MatrixModels")) {
+            gp$model.matrix = MatrixModels::model.Matrix(
+                new.fix.formula,
+                data = model.frame(new.fix.formula, data.same.len, na.action=inla.na.action),
+                contrasts.arg = contrasts, sparse=TRUE)
+        } else {
+            gp$model.matrix = model.matrix(
+                new.fix.formula,
+                data = model.frame(new.fix.formula, data.same.len, na.action=inla.na.action),
+                contrasts.arg = contrasts)
+        }
         ## as NA's in factors are not set to zero in
         ## 'inla.na.action'. Do that here if the strategy is 'inla',
         ## otherwise signal an error.
@@ -1084,9 +1093,37 @@
                 stopifnot(length(yy) == MPredictor)
             }
         }
-        
+
         if (!is.null(yy) && !(is.numeric(yy) || is.list(yy) || is.matrix(yy) || inla.is.matrix(yy) || all(is.na(yy)))) {
             stop(paste("The response for family[", i.family, "] is not of type 'numeric|list|matrix'; don't know what to do.", sep=""))
+        }
+
+        ## we can check for 'survial' here, either if data is and family isn't,  or the oposite
+        if (is.list(yy) &&
+            all(is.element(names(yy), names(inla.surv(1, 1))))) {
+            ## check if family is of survival type. if not, check if appending 'surv' is.
+            if (!inla.model.properties(family[i.family], "likelihood")$survival) {
+                new.fam = paste0(family[i.family], "surv")
+                ok = inla.model.properties(new.fam, "likelihood", stop.on.error=FALSE)$survival
+                if (!is.null(ok) && ok) {
+                    warning(paste0("*** WARNING *** Input family is '", family[i.family],
+                                   "' but input data is of 'inla.surv(...)' type\n",
+                                   "  *** WARNING *** Do you ment to use family '", new.fam,
+                                   "' ?"))
+                }
+            }
+        }
+        if (inla.model.properties(family[i.family], "likelihood")$survival && !is.list(yy)) {
+            ## check if removing 'surv' makes a valid family
+            new.fam = gsub("surv$", "", family[i.family])
+            ok = inla.model.properties(new.fam, "likelihood",
+                                       stop.on.error=FALSE)$survival
+            if (!is.null(ok) && !ok) {
+                warning(paste0("*** WARNING *** Input family is '", family[i.family],
+                               "' and require input of type 'inla.surv(...)'\n",
+                               "  *** WARNING *** Do you ment to use family '", new.fam,
+                               "' ?"))
+            }
         }
 
         files = inla.create.data.file(y.orig= yy, mf=mf, E=E, scale=scale, 
@@ -1634,7 +1671,7 @@
                                 ncol = dim(gp$random.spec[[r]]$extraconstr$A)[2]
 
                                 if (ncol != fac*n)
-                                    stop(paste("Wrong dimension for the extraconstraint: ncol", ncol, "n", n))
+                                    stop(paste("Wrong dimension for the extraconstr: ncol", ncol, "n", n))
                                 
                                 A = matrix(0, nrow+1, ncol)
                                 e = c(gp$random.spec[[r]]$extraconstr$e, 0)
@@ -1668,7 +1705,7 @@
                                 ncol = dim(gp$random.spec[[r]]$extraconstr$A)[2]
 
                                 if (ncol != n)
-                                    stop(paste("Wrong dimension for the extraconstraint: ncol", ncol, "n", n))
+                                    stop(paste("Wrong dimension for the extraconstr: ncol", ncol, "n", n))
                                 
                                 A = matrix(0, nrow+length(con), ncol)
                                 e = c(gp$random.spec[[r]]$extraconstr$e, rep(0, length(con)))
@@ -1689,13 +1726,13 @@
                 ##print(gp$random.spec[[r]]$extraconstr$A)
                 ##print(gp$random.spec[[r]]$extraconstr$e)
                 
-                ##and in case a file for the extraconstraint
+                ##and in case a file for the extraconstr
                 if (!is.null(gp$random.spec[[r]]$extraconstr)) {
                     A=gp$random.spec[[r]]$extraconstr$A
                     e=gp$random.spec[[r]]$extraconstr$e
 
                     if (ncol(A) != inla.model.properties(gp$random.spec[[r]]$model, "latent")$aug.factor*n)
-                        stop(paste("\n\tncol in matrix A(extraconstraint) does not correspont to the length of f:",
+                        stop(paste("\n\tncol in matrix A(extraconstr) does not correspont to the length of f:",
                                    ncol(A),
                                    inla.model.properties(gp$random.spec[[r]]$model, "latent")$aug.factor*n))
 

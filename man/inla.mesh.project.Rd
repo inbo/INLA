@@ -19,10 +19,11 @@ inla.mesh.projector(...)
 \method{inla.mesh.projector}{inla.mesh}(mesh,
              loc = NULL,
              lattice = NULL,
-             xlim = range(mesh$loc[,1]),
-             ylim = range(mesh$loc[,2]),
+             xlim = NULL,
+             ylim = NULL,
              dims = c(100,100),
              projection = NULL,
+             crs = NULL,
              ...)
 
 \method{inla.mesh.projector}{inla.mesh.1d}(mesh,
@@ -32,7 +33,9 @@ inla.mesh.projector(...)
 
 \method{inla.mesh.project}{inla.mesh.projector}(projector, field, ...)
 
-\method{inla.mesh.project}{inla.mesh}(mesh, loc, field = NULL, ...)
+\method{inla.mesh.project}{inla.mesh}(mesh, loc, field = NULL,
+                  crs=NULL,
+...)
 \method{inla.mesh.project}{inla.mesh.1d}(mesh, loc, field = NULL, ...)
 }
 \arguments{
@@ -47,10 +50,10 @@ inla.mesh.projector(...)
     An \code{\link{inla.mesh.lattice}} object.
   }
   \item{xlim}{
-    X-axis limits for a lattice.
+    X-axis limits for a lattice. For R2 meshes, defaults to covering the domain.
   }
   \item{ylim}{
-    Y-axis limits for a lattice.
+    Y-axis limits for a lattice. For R2 meshes, defaults to covering the domain.
   }
   \item{dims}{
     Lattice dimensions.
@@ -62,6 +65,10 @@ inla.mesh.projector(...)
   }
   \item{projection}{
     One of \code{c("default", "longlat", "longsinlat", "mollweide")}.
+  }
+  \item{crs}{
+    An optional CRS or inla.CRS object associated with \code{loc} and/or
+    \code{lattice}.
   }
   \item{\dots}{Additional arguments passed on to methods.}
 }

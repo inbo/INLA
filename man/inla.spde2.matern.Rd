@@ -4,7 +4,8 @@
   Matern SPDE model object for INLA
 }
 \description{
-  Create an \code{inla.spde2} model object for a Matern model.
+  Create an \code{inla.spde2} model object for a Matern model. Use
+  \code{inla.spde2.pcmatern} instead for a PC prior for the parameters.
 }
 \usage{
 inla.spde2.matern(mesh,
@@ -22,7 +23,8 @@ inla.spde2.matern(mesh,
                   prior.kappa = NULL,
                   theta.prior.mean = NULL,
                   theta.prior.prec = 0.1,
-                  n.iid.group = 1)
+                  n.iid.group = 1,
+                  ...)
 }
 \arguments{
   \item{mesh}{
@@ -58,6 +60,7 @@ inla.spde2.matern(mesh,
     \code{mesh$m} for 1D), or as general constraints on the collection
     of replicates (\code{ncol(A)} should be \code{mesh$n * n.iid.group}
     for 2D meshes, \code{mesh$m * n.iid.group} for 1D).}
+  \item{\dots}{Additional parameters for special uses.}
 }
 \details{
   This method constructs a Matern SPDE model, with spatial scale
@@ -111,6 +114,7 @@ inla.spde2.matern(mesh,
 \seealso{
   \code{\link{inla.mesh.2d}}, \code{\link{inla.mesh.create}},
   \code{\link{inla.mesh.1d}}, \code{\link{inla.mesh.basis}},
+  \code{\link{inla.spde2.pcmatern}},
   \code{\link{inla.spde2.generic}}
 }
 \examples{
