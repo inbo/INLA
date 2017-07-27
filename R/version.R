@@ -31,7 +31,7 @@
 ##!}
 ##!%%
 ##!
-##!\author{Havard Rue \email{hrue@math.ntnu.no}}
+##!\author{Havard Rue \email{hrue@r-inla.org}}
 ##!
 ##!\examples{
 ##!## Summary of all
@@ -49,11 +49,11 @@
                                    "date",
                                    "bdate"))
 {
-    rinla.hgid =  inla.trim("hgid: 7e45fc2b7a2f  date: Tue Jan 31 09:14:12 2017 +0300")
-    inla.hgid  =  inla.trim("hgid: 7e45fc2b7a2f  date: Tue Jan 31 09:14:12 2017 +0300")
-    date       =  inla.trim("Tue 31 Jan 09:27:31 EAT 2017")
-    bdate      =  inla.trim("201701310927")
-    version      =  inla.trim("0.0-1485844051")
+    rinla.hgid =  inla.trim("Version_17.06.20")
+    inla.hgid  =  inla.trim("Version_17.06.20")
+    date       =  inla.trim("Tue 20 Jun 12:36:50 JST 2017")
+    bdate      =  inla.trim("201706201236")
+    version      =  inla.trim("17.06.20")
     what = match.arg(what)
 
     if (what %in% c("default", "info")) {
@@ -63,13 +63,14 @@
         cat(paste(  "\tINLA date ...............: ",  date, "\n",  sep=""))
         cat(paste(  "\tINLA hgid ...............: ", rinla.hgid, "\n", sep=""))
         cat(paste(  "\tINLA-program hgid .......: ", inla.hgid, "\n", sep=""))
-        cat(        "\tMaintainers .............: Havard Rue <hrue@math.ntnu.no>\n")
+        cat(        "\tMaintainers .............: Havard Rue <hrue@r-inla.org>\n")
         cat(        "\t                         : Finn Lindgren <finn.lindgren@gmail.com>\n")
         cat(        "\t                         : Daniel Simpson <dp.simpson@gmail.com>\n")
         cat(        "\t                         : Andrea Riebler <andrea.riebler@math.ntnu.no>\n")
         cat(        "\t                         : Elias Teixeira Krainski <elias.krainski@math.ntnu.no>\n")
         cat(        "\t                         : Geir-Arne Fuglstad <fulgstad@math.ntnu.no>\n")
-        cat(        "\tWeb-page ................: www.r-inla.org\n")
+        cat(        "\tMain web-page ...........: www.r-inla.org\n")
+        cat(        "\tDownload-page ...........: inla.r-inla-download.org\n")
         cat(        "\tEmail support ...........: help@r-inla.org\n")
         cat(        "\t                         : r-inla-discussion-group@googlegroups.com\n")
         cat(        "\tSource-code .............: bitbucket.org/hrue/r-inla\n")

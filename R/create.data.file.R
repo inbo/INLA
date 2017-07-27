@@ -250,14 +250,16 @@
         }
 
     } else if (inla.one.of(family, c("stochvol", "stochvolt", "stochvolnig", "loggammafrailty",
-                                     "iidlogitbeta", "qkumar", "qloglogistic"))) {
+                                     "iidlogitbeta", "qkumar", "qloglogistic", "gp"))) {
         response = cbind(ind, y.orig)
         null.dat = is.na(response[, 2L])
         response = response[!null.dat,]
 
-    } else if (inla.one.of(family, c("nmix"))) {
+    } else if (inla.one.of(family, c("nmix", "nmixnb"))) {
 
+        ## yes. it must be the same for both model nmix and nmixnb
         mmax = length(inla.model.properties(model="nmix", section="likelihood")$hyper)
+
         response = cbind(IDX=ind, y.orig)
         col.idx = grep("^IDX$", names(response))
         col.x = grep("^X[0-9]+", names(response))
