@@ -28,23 +28,26 @@
 
 `inla.trim` = function(string)
 {
-    ## trim leading and trailing whitespaces and dots. there is a
-    ## function in R.oo called `trim' that do this, but I don't want
-    ## INLA to be dependent on R.oo. This function also works the
-    ## string is a list of strings.
+    ## trim leading and trailing whitespaces. there is a function in R.oo called `trim' that do
+    ## this, but I don't want INLA to be dependent on R.oo. This function also works the string
+    ## is a list of strings.
 
-    string = gsub("^[ \t.]+", "", string)
-    string = gsub("[ \t.]+$", "", string)
+    string = gsub("^[ \t]+", "", string)
+    string = gsub("[ \t]+$", "", string)
     return (string)
 }
 
 `inla.namefix` = function(string)
 {
-    ## makes inla-name from string
-    if (FALSE) {
-        string = inla.trim(string)
-        string = gsub("[^A-Za-z0-9.*]+", ".", string)
-        string = gsub("[.]+", ".", string)
+    ## must be the same as in iniparser.h
+    re = "[$]" 
+    re.to = "|S|"
+    old.string = inla.trim(string)
+    ## special characters, need to do something
+    while(TRUE) {
+        string = gsub(re, re.to, old.string)
+        if (string == old.string) break
+        old.string = string
     }
     return (string)
 }
@@ -246,9 +249,9 @@
     cat("Source files in ", dir, ". Loaded ", length(files), " files and replaced ", nfuncs, " functions.\n", sep="")
 
     if (binaries) {
-        inla.setOption("inla.call", paste(bin.path, "/", "inla", sep=""))
-        inla.setOption("fmesher.call", paste(bin.path, "/", "fmesher", sep=""))
-        cat("Define new values for 'inla.call' and 'fmesher.call': ", bin.path, "/{inla,fmesher}\n", sep="")
+        inla.setOption("inla.call", path.expand(paste(bin.path, "/", "inla", sep="")))
+        inla.setOption("fmesher.call", path.expand(paste(bin.path, "/", "fmesher", sep="")))
+        cat("Define new values for 'inla.call' and 'fmesher.call'\n", sep="")
     }
 
     ## hash the models again

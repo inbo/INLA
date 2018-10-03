@@ -49,11 +49,11 @@
                                    "date",
                                    "bdate"))
 {
-    rinla.hgid =  inla.trim("Version_17.06.20")
-    inla.hgid  =  inla.trim("Version_17.06.20")
-    date       =  inla.trim("Tue 20 Jun 12:36:50 JST 2017")
-    bdate      =  inla.trim("201706201236")
-    version      =  inla.trim("17.06.20")
+    rinla.hgid =  inla.trim("Version_18.07.11")
+    inla.hgid  =  inla.trim("Version_18.07.11")
+    date       =  inla.trim("Wed Jul 11 10:58:35 +03 2018")
+    bdate      =  inla.trim("201807111058")
+    version      =  inla.trim("18.07.11")
     what = match.arg(what)
 
     if (what %in% c("default", "info")) {
@@ -66,8 +66,9 @@
         cat(        "\tMaintainers .............: Havard Rue <hrue@r-inla.org>\n")
         cat(        "\t                         : Finn Lindgren <finn.lindgren@gmail.com>\n")
         cat(        "\t                         : Daniel Simpson <dp.simpson@gmail.com>\n")
-        cat(        "\t                         : Andrea Riebler <andrea.riebler@math.ntnu.no>\n")
         cat(        "\t                         : Elias Teixeira Krainski <elias.krainski@math.ntnu.no>\n")
+        cat(        "\t                         : Haakon Bakka <bakka@r-inla.org>\n")
+        cat(        "\t                         : Andrea Riebler <andrea.riebler@math.ntnu.no>\n")
         cat(        "\t                         : Geir-Arne Fuglstad <fulgstad@math.ntnu.no>\n")
         cat(        "\tMain web-page ...........: www.r-inla.org\n")
         cat(        "\tDownload-page ...........: inla.r-inla-download.org\n")

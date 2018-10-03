@@ -8,11 +8,22 @@
 
 \description{TODO}
 \usage{
-   inla.sens(inlaRes)
+inla.sens(inlaObj, lambda = 0.3, nThreads = NULL, seed = NULL,
+          nGrid = 1e4, nSamples = 2e4, nIntGrid = 1e4, useSkew = FALSE,
+          calcPriorSens = FALSE, makePlots = TRUE)
 }
 
 \arguments{
   \item{inlaRes}{Object returned by \code{inla} function.}
+  \item{lambda}{TODO}
+  \item{nThreads}{TODO}
+  \item{seed}{TODO}
+  \item{nGrid}{TODO}
+  \item{nSamples}{TODO}
+  \item{nIntGrid}{TODO}
+  \item{useSkew}{TODO}
+  \item{calcPriorSens}{TODO}
+  \item{makePlots}{TODO}
 }
 \value{
   \code{inla.sens}  plots robustness and returns object with different robustnesses
