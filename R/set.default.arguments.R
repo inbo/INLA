@@ -12,6 +12,7 @@
 ## Export: inla.set.control.results.default
 ## Export: inla.set.control.mode.default
 ## Export: inla.set.control.hazard.default
+## Export: inla.set.control.gev2.default
 
 ## Export: control.lincomb
 ## Export: control.update
@@ -27,7 +28,7 @@
 ## Export: control.results
 ## Export: control.mode
 ## Export: control.hazard
-
+## Export: control.gev2
 
 
 ### Defines default arguments
@@ -125,8 +126,14 @@
         prior = NULL,
 
         ##:ARGUMENT: param (OBSOLETE!) The parameters for the prior distribution(s) for the hyperparmater(s)
-        param = NULL)
+        param = NULL,
 
+        ##:ARGUMENT: npoints Number of points used to do the numerical integration (default 101)
+        npoints = 101, 
+
+        ##:ARGUMENT: integrator The integration scheme to use (\code{default}, \code{quadrature}, \code{simpson})
+        integrator = "default")
+    
     ##:SEEALSO: inla
 }
 
@@ -144,9 +151,6 @@
 
         ##:ARGUMENT: variant The \code{variant} of the link function, where the interpretation of \code{variant} is model-dependent.
         variant = NULL, 
-
-        ##:ARGUMENT: nq Number of quadrature-points used to do the numerical integration (default 15)
-        nq = 15, 
 
         ##:ARGUMENT: hyper Definition of the hyperparameter(s) for the link model chosen
         hyper = NULL,
@@ -207,7 +211,7 @@
     ##:NAME: control.compute
     list(
         ##:ARGUMENT: openmp.strategy The computational strategy to use: 'small', 'medium', 'large', 'huge' and 'default'. There are also two options for the pardiso solver: 'pardiso.serial' and 'pardiso.parallel'. The difference is how the parallelisation is done, and is tuned for 'small'-sized models, 'medium'-sized models, etc. The default option tries to make an educated guess, but this allows to overide this selection. Default is 'default'
-        openmp.strategy = "default", ## "small", "medium", "large", "huge",  "pardiso.serial",  "pardiso.parallel"
+        openmp.strategy = "default", 
 
         ##:ARGUMENT: hyperpar A boolean variable if the marginal for the hyperparameters should be computed. Default TRUE.
         hyperpar=TRUE,
@@ -248,12 +252,37 @@
     ##:SEEALSO: inla
 }
 
+`inla.set.control.gev2.default` =
+    function(...)
+{
+    ##:EXTRA: The \code{control.gev2}-list is set within the corresponding \code{control.family}-list as control parameters to the \code{family="gev2"}
+    ##:NAME: control.gev2.default
+    list(
+        ##:ARGUMENT: q.location The quantile level for the location parameter
+        q.location = 0.5,
+        
+        ##:ARGUMENT: q.spread The quantile level for the spread parameter (must be < 0.5)
+        q.spread = 0.25,
+        
+        ##:ARGUMENT: q.mix The lower and upper quantile level for the mixing function
+        q.mix = c(0.10, 0.20), 
+
+        ##:ARGUMENT: beta.ab The parameters a and b in the Beta mixing function
+        beta.ab = 5L)
+
+    ##:SEEALSO: inla
+}
+
+
 `inla.set.control.family.default`=
     function(...)
 {
     ##:EXTRA: 
     ##:NAME: control.family
     list(
+        ##:ARGUMENT: dummy A dummy argument that can be used as a workaround
+        dummy = 0,
+
         ##:ARGUMENT: hyper Definition of the hyperparameters
         hyper = NULL,
 
@@ -275,8 +304,11 @@
         ##:ARGUMENT: sn.shape.max Maximum value for the shape-parameter for Skew Normal observations (default 5.0)
         sn.shape.max = 5.0,
 
-        ##:ARGUMENT: gev.scale.xi The internal scaling of the shape-parameter for the GEV distribution. (default 0.01)
-        gev.scale.xi = 0.01,
+        ##:ARGUMENT: gev.scale.xi (Expert option, do not use unless you know what you are doing.) The internal scaling of the shape-parameter for the GEV distribution. (default 0.1)
+        gev.scale.xi = 0.1,
+
+        ##:ARGUMENT: control.gev2  See \code{?control.gev2}
+        control.gev2 = NULL, 
 
         ##:ARGUMENT: cenpoisson.I The censoring interval for the censored Poisson
         cenpoisson.I = c(-1L, -1L),
@@ -343,7 +375,7 @@
     ##:EXTRA: 
     ##:NAME: control.inla
     ans = list(
-        ##:ARGUMENT: strategy  Character The strategy to use for the approximations; one of 'gaussian', 'simplified.laplace' (default) or 'laplace'
+        ##:ARGUMENT: strategy  Character The strategy to use for the approximations; one of 'gaussian', 'simplified.laplace' (default), 'laplace' or 'adaptive'
         strategy="simplified.laplace",
 
         ##:ARGUMENT: int.strategy  Character The integration strategy to use; one of 'auto' (default),  'ccd', 'grid', 'eb' (empirical bayes),  'user' or 'user.std'
@@ -397,10 +429,13 @@
         ##:ARGUMENT: tolerance.x Numerical The tolerance for the change in the hyperparameters (root-mean-square) in the optimisation of the hyperparameters.
         tolerance.x = NULL, 
 
+        ##:ARGUMENT: tolerance.step Numerical The tolerance for the change in root-mean_squre in the inner Newton-like optimisation of the latent field.
+        tolerance.step = 0.0005, 
+
         ##:ARGUMENT: restart Numerical To improve the optimisation, the optimiser is restarted at the found optimum 'restart' number of times.
         restart = 0L,
 
-        ##:ARGUMENT: optimiser Character The optimiser to use; one of 'gsl', 'domin' or 'default'.
+        ##:ARGUMENT: optimiser Character The optimiser to use; one of 'gsl' or 'default'.
         optimiser = "default",
 
         ##:ARGUMENT: verbose Logical Run in verbose mode? (Default FALSE)
@@ -427,6 +462,9 @@
         ##:ARGUMENT: adapt.hessian.scale Numerical The scaling of the 'h' after each trial.
         adapt.hessian.scale = NULL, 
 
+        ##:ARGUMENT: adaptive.max Selecting \code{strategy="adaptive"} will chose the default strategy for all fixed effects and model components with length less or equal to \code{adaptive.max}, for others, the gaussian strategy will be applied.
+        adaptive.max = 10L,
+        
         ##:ARGUMENT: huge Logical If TRUE then try to do some of the internal parallisations differently. Hopefully this will be of benefite for 'HUGE' models. (Default FALSE.) [THIS OPTION IS OBSOLETE AND NOT USED!]
         huge = FALSE,
 
@@ -721,3 +759,4 @@ control.predictor = inla.make.completion.function(names(inla.set.control.predict
 control.results = inla.make.completion.function(names(inla.set.control.results.default()))
 control.mode = inla.make.completion.function(names(inla.set.control.mode.default()))
 control.hazard = inla.make.completion.function(names(inla.set.control.hazard.default()))
+control.gev2 = inla.make.completion.function(names(inla.set.control.gev2.default()))

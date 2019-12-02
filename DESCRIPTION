@@ -15,7 +15,8 @@ Description: Full Bayesian analysis of latent Gaussian models using Integrated N
 Depends:
     R (>= 3.2),
     Matrix,
-    sp
+    sp,
+    parallel
 Suggests:
     Deriv,
     devtools,
@@ -52,6 +53,7 @@ VignetteBuilder: knitr
 BuildVignettes: true
 LazyData: true
 License: GPL (>= 2)
-RoxygenNote: 6.0.1
-Version: 18.07.12
-Date: 2018-07-12 (Version_18.07.12)
+RoxygenNote: 6.1.1
+StagedInstall: no
+Version: 19.09.03
+Date: 2019-09-03 (Version_19.09.03)

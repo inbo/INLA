@@ -65,7 +65,9 @@
 ##!         args.slm = list(rho.min = NULL, rho.max = NULL, 
 ##!                         X = NULL, W = NULL, Q.beta = NULL),
 ##!         args.ar1c = list(Z = NULL, Q.beta = NULL),
+##!         args.intslope = list(subject = NULL, strata = NULL, covariates = NULL), 
 ##!         correct = NULL,
+##!         locations = NULL, 
 ##!         debug = FALSE)
 ##!}
 ##!\arguments{
@@ -307,7 +309,7 @@
     ##!\item{scale}{A scaling vector. Its meaning depends on the model.}
     scale = NULL,
 
-    ##!\item{strata}{A stratum vector. It meaning depends on the model.}
+    ##!\item{strata}{Currently not in use}
     strata = NULL,
 
     ##!\item{rgeneric}{A object of class \code{inla.rgeneric} which defines the model. (EXPERIMENTAL!)}
@@ -322,9 +324,15 @@
     ##!\item{args.ar1c}{Required arguments to the model="ar1c"; see the documentation for further details.},
     args.ar1c = list(Z = NULL, Q.beta = NULL),
 
+    ##!\item{args.intslope}{A list with the \code{subject} (factor),  \code{strata} (factor) and \code{covariates} (numeric) for the \code{intslope} model; see the documentation for further details.}, 
+    args.intslope = list(subject = NULL, strata = NULL, covariates = NULL), 
+
     ##!\item{correct}{Add this model component to the list of variables to be used in the corrected Laplace approximation? If \code{NULL} use default choice,  otherwise correct if \code{TRUE} and do not if \code{FALSE}. (This option is currently experimental.)},
     correct = NULL,
 
+    ##!\item{locations}{A matrix with locations for the model \code{dmatern}. This also defines \code{n}.}
+    locations = NULL,
+    
     ##!\item{debug}{Enable local debug output}
     debug = FALSE)
 {
@@ -700,6 +708,38 @@
         }
     }
 
+    if (inla.one.of(model, c("dmatern"))) {
+        stopifnot(!missing(locations) && !is.null(locations))
+        if (is.vector(locations)) {
+            locations = matrix(locations, ncol = 1)
+        }
+        stopifnot(is.matrix(locations))
+        stopifnot(nrow(locations) > 1)
+        stopifnot(!any(is.na(locations)))
+        n = nrow(locations)
+    } else {
+        stopifnot(missing(locations) || is.null(locations))
+    }
+
+    if (inla.one.of(model, "intslope")) {
+        stopifnot(!is.null(args.intslope$subject))
+        stopifnot(!is.null(args.intslope$strata))
+        stopifnot(!is.null(args.intslope$covariates))
+        zz = args.intslope$covariates
+        zz[is.na(zz)] = 0
+        args.intslope = list(
+            subject = as.numeric(as.factor(args.intslope$subject)),
+            strata = as.numeric(as.factor(args.intslope$strata)),
+            covariates = zz)
+        if (is.null(n)) {
+            n = length(args.intslope$subject)
+        } else {
+            stopifnot(n == length(args.intslope$subject))
+        }
+        stopifnot(length(args.intslope$subject) == length(args.intslope$strata))
+        stopifnot(length(args.intslope$subject) == length(args.intslope$covariates))
+    }
+
     ## is N required?
     if (is.null(n) && (!is.null(inla.model.properties(model, "latent")$n.required)
                        && inla.model.properties(model, "latent")$n.required)) {
@@ -1001,9 +1041,11 @@
         rgeneric = rgeneric,
         scale.model = as.logical(scale.model),
         adjust.for.con.comp = as.logical(adjust.for.con.comp),
+        args.intslope = args.intslope, 
         args.slm = args.slm,
         args.ar1c = args.ar1c,
-        correct = correct
+        correct = correct,
+        locations = locations
         )
 
     if (debug) print(ret)

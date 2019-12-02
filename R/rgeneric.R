@@ -71,7 +71,7 @@
     
     ## variables defined the in the define-call, are stored here
     ## (which is in the path)
-    envir = environment(sys.call()[[1]]) 
+    envir = parent.env(environment())
 
     interpret.theta = function()
     {
@@ -198,7 +198,7 @@
 
     ## variables defined the in the define-call, are stored here
     ## (which is in the path)
-    envir = environment(sys.call()[[1]]) 
+    envir = parent.env(environment())
     
     interpret.theta = function()
     {
@@ -266,7 +266,7 @@
     env = if (length(args) > 0) as.environment(args) else new.env()
     parent.env(env) = .GlobalEnv
     environment(model) = env
-    
+
     rmodel = list(
         f = list(
             model = "rgeneric", 
@@ -316,6 +316,8 @@
     result = NULL
     cmd = match.arg(cmd)
     res = do.call(model$definition, args = list(cmd = cmd, theta = theta))
+    time.ref = proc.time()[3]
+    
     if (cmd %in% "Q") {
         Q = inla.as.sparse(res)
         debug.cat("dim(Q)", dim(Q))
@@ -358,10 +360,20 @@
         stop(paste("Unknown command", cmd))
     }
     res = NULL
+
+    if (FALSE) {
+        nm = "...cpu.time"
+        envir = environment(model$definition)
+        cpu.time = if (exists(nm, envir, envir)) get(nm, envir = envir) else list()
+        if (is.null(cpu.time[[cmd]])) cpu.time[[cmd]] = list(total.time = 0, n.times = 0)
+        cpu.time[[cmd]] =
+            list(total.time = cpu.time[[cmd]]$total.time + proc.time()[3] - time.ref,
+                 n.times = cpu.time[[cmd]]$n.times + 1)
+        assign(nm, cpu.time, envir = envir)
+    }
     
     return (as.numeric(result))
 }
-
 
 `inla.rgeneric.q` = function(rmodel,
                              cmd = c("graph", "Q", "mu", "initial", "log.norm.const",
